@@ -1,0 +1,80 @@
+Maciej Ficek
+
+Made in R v. 4.3.2.
+
+Part 1: Data Preparation
+I start with loading data:
+
+After checking data with View, we get:
+
+Dataset Titanic contains variables:
+- PassengerId – unique identifier of each passenger
+- Survived – 0 if passenger died, 1 if survived
+- Pclass – „Passenger Class”, class of the ticket. 1 is the best, 3 the worst
+- Name – name of the passenger
+- Sex – sex of the passenger
+- Age – age of the passenger in years
+- Sibsp – „Siblings/Spouse” – number of siblings and husbands/wifes on the ship
+- Parch – number of parents and children on the ship
+- Ticket – number of ticket. It seems a little bit "random" for us at that moment
+- Fare – price of the ticket
+- Cabin – number of the room, most of data unknown, therefore we will erase that column
+- Embarked – city, where the passenger entered the ship
+
+Interesting fact is proportion of length of training and test sets. Test set has almost 50% length of the training one, which is quite unusual - usually the length of test set is no more than 10-20% of the training set. In case of deep learning task, it is often even less.
+
+Originally, there were almost 2200 people on the Titanic, but the loaded dataset is shorter. We don't have knowledge nor how the subset used in the exercise was chosen neither how the data were divided into training set and test set. Was the choice random, or not?
+
+#Selection of columns
+
+#There are NA's in Age column. Their amount compared to the size of data is too big to just delete that column. The most commons step one should take is to exchange NA with some measure related with that column such as: mean, median, dominant, moving average (in case of ordered data) etc. Age is ordered and continous trait, so I decided to move forward with mean grouped by sex, because it feels proper with the problem of that nature.
+
+Most of columns do not contain outliers, as they are categorical ones with small amount of values. Short outlook on Age and Fare suggest also lack of outliers in them (each Age >0 i <100; in Fare we have a group of a little big bigger values, but from dataset we do not gain the knowledge why some people have much larger Fare, so we do not have a reason to treat these observations as outliers.
+
+Column Sex was changed to numeric, so I can calculate the correlation with other numeric columns.
+
+Only big correlations (with respect to absolute value) are between class and the sex and between sex and survived. It menas that among 1st class passengers there were more women, and more men among 3rd class, and that women had bigger chances to survive than men.
+
+Of course counting correlation to Ticket or Cabin has nos sense, as these variables are categorical despite being represented with numbers (for example, ticket "10" is not "bigger" than ticket with number "5"). In case of variable Embarked, we can calculate correlation by using Hot One Encoding, but we will skip it for now.
+
+# Part 2: Training model, predictions, calculation of errors
+
+To answer the question "What are the chances of a passenger surviving a disaster?" one should use a model that returns, for each sample, the probability of belonging to each (in this case, two) class.
+ 
+The simplest and at the same time easy-to-use model for two classes is logistic regression. It doesn't directly return classes but the probabilities of belonging to each class. Then, classes can be obtained by choosing a threshold point, for example, assigning values >=0.5 to class 1 and values <0.5 to class 0. Logistic regression can also be used for multi-class classification problems using the One-vs-All (OvA) rule. This means classifying into n classes is reduced to n-1 binary classifications. First, one class versus the sum of the remaining n-1 classes, then if a sample is assigned to the sum of n-1 classes, the second class versus the sum of the remaining n-2 classes (from the third to the last), and so on.
+
+Decision trees are perhaps the easiest classification algorithm to explain. They make classification decisions based on a series of YES/NO answers to several questions, and the classification values are in the leaf nodes of the tree, to which a given sample is assigned based on the questions. Decision trees are favored by practitioners, such as doctors, because they have a clear and easy-to-interpret structure. Decision trees can also be used to create more advanced structures like forests. However, their downside is that from a mathematical point of view, it's harder to explain why a tree looks the way it does.
+
+In practice, the tree doesn't have to be binary; questions can be formulated in a way that leads to more than 2 branches from each node. However, this can sacrifice transparency and readability, making the model more susceptible to overfitting.
+
+Often, in datasets with many variables, random forests are used to preliminarily select the most important features, and then another model is built on the variables deemed most important by the tree.
+
+Let's check how many samples were misclassified. For linear regression, we'll treat probabilities greater than or equal to 0.5 as 1, and less than 0.5 as 0.
+
+There were 30 out of 418 misclassified samples for regression and 47 for the decision tree. Considering the simplicity of the models and the small sample size, this is a good result. More importantly, the fact that the model accuracy for the test data was better than for the training data is crucial. This indicates, firstly, the absence of overfitting, and secondly, that the model somehow reflects reality reasonably well.
+
+For classification problems, deep learning methods like neural networks can also be applied. However, they usually perform poorly on small-sized data such as the Titanic dataset, so in this case, it's better to stick with "shallow" methods.
+
+Confusion matrices suggest that the regression model is more "balanced" – a similar number of survivors were classified as deceased and vice versa. However, the decision tree is more unbalanced – significantly more deceased were classified as survivors than vice versa. More formally, regression evenly makes errors of the 1st and 2nd kind, whereas the tree makes significantly more errors of the 1st kind.
+
+Analysis of variance (ANOVA) suggests that passenger class and gender had the greatest impact on the results. The port of embarkation and the number of siblings/spouses or parents/children had minimal significance.
+
+For the tree model, we cannot directly calculate information criteria.
+
+
+Let's run these 2 models again, this time considering only the most important variables: Pclass and Sex. It turns out that the logistic regression model achieves even better prediction quality, while the tree model appears to be heavily underfit; it misclassifies 190 samples incorrectly on the training set, which is over 15%.
+
+However, the calculations of absolute errors and mean squared errors (MSE) at the end suggest that the more complex model with more variables achieved lower error values. The simpler model made fewer mistakes, but when it did, they were "larger" (which is logical since there are only 6 passenger groups for it – class can be chosen in 3 ways, and gender in 2). On the other hand, the model with more variables more frequently assigned probabilities close to 0.5 to data points, so even when it made mistakes, the error component from that mistake was small.
+
+It's also worth looking at the coefficients of the logistic regression model. The variable Embarked has been replaced by 3 dummy variables. Their absolute values seem dominant in the model (excluding the intercept term), which superficially suggests that the port had a significant influence on the results. However, what's really important is that the differences between individual variables within the Embarked group are close to zero, meaning that the port of embarkation actually had little impact on the chances of survival. Similarly, Fare. Superficially, it might seem that at the beginning of the work, I should replace outliers in the Fare column with smaller estimates. However, the principle of "work smart, not hard" won – given the small significance of this variable (the coefficient value close to 0.001 in the model), it would be pointless work. Of course, I'm not claiming that such an approach is always good. I'm saying it was good here.
+
+The AIC and BIC of the simpler regression model are higher than those of the more complex one. In practice, a model using only 2 variables is rarely good. The effectiveness of our model with 2 variables is rather occasional, and the model itself has more "educational" value. Generally, for another dataset, a model using only the 2 most significant variables would likely be too simple and underfit.
+
+Using cross-entropy in our dataset to improve the models doesn't make much sense because the test data is almost 50% of the training data, so we could only perform 2 full "substitutions" of the test set for an equally sized portion of the training set.
+
+
+Additional comment: The data from the Titanic disaster experiment are quite specific. Disasters are not easily replicable, and each one is characterized by a high degree of randomness. Most of the data features turned out to have little significance in relation to classification.
+
+The task of artificial intelligence is to train itself to understand a certain "essence" of a similar repeatable phenomenon in the future. For example, the rules of chess remain the same in every game, and you can play any number of chess games. However, in the case of a maritime disaster, a model trained on the Titanic doesn't necessarily have to correctly classify the survivors of another ship that sinks, even if the dataset from another ship had the same variables and followed the same route on the same day of the year. In practical problems, it's almost never possible to achieve classification accuracy at 100%.
+
+Furthermore, there's no evidence that the models trained by me, or even better models, would do a good job even in classifying passengers on the Titanic itself. Those nearly 1000 passengers who were on the ship but are not in the downloaded dataset, as it's unclear on what basis this division was made.
